@@ -12,6 +12,7 @@ Rather, it is just my own exploration of Vulkan saved as a collection of commits
 
 
 FYI, this specific repo uses [`winit`](https://github.com/rust-windowing/winit) (windowing) and [`ash`](https://github.com/ash-rs/ash) (sane Vulkan bindings).
+Oh, and it only works on Linux (or other X11) :p.
 
 ##  Latest Commits
 
@@ -19,4 +20,5 @@ FYI, this specific repo uses [`winit`](https://github.com/rust-windowing/winit) 
 >  Just use `git reflog` or something lazy guy. :)
 
 - Initialization, Render Loop, and Color! ~ 566 SLOC
+- Hello Triangle w/ RGB! ~ 748 SLOC
 

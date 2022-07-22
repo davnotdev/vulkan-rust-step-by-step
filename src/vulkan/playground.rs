@@ -4,6 +4,7 @@ pub struct VulkanPlayground {
     bvk: BabyVulkan,
     swappy: VulkanSwapchain,
     render: VulkanRender,
+    pipeline: VulkanPipeline,
 
     cmd_buf: vk::CommandBuffer,
     cmd_pool: vk::CommandPool,
@@ -18,6 +19,7 @@ impl VulkanPlayground {
         let bvk = BabyVulkan::create(window)?;
         let swappy = VulkanSwapchain::create(&bvk, w, h)?;
         let render = VulkanRender::create(&bvk, &swappy)?;
+        let pipeline = VulkanPipeline::create(&bvk, &render, swappy.extent)?;
         let cmd_pool = bvk.create_command_pool()?;
         Some(VulkanPlayground {
             cmd_buf: bvk.create_primary_command_buffer(cmd_pool)?,
@@ -30,6 +32,7 @@ impl VulkanPlayground {
             bvk,
             swappy,
             render,
+            pipeline,
         })
     }
 
@@ -89,6 +92,10 @@ impl VulkanPlayground {
                     &render_pass_begin_info,
                     vk::SubpassContents::INLINE,
                 );
+                {
+                    self.bvk.dev.cmd_bind_pipeline(self.cmd_buf, vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
+                    self.bvk.dev.cmd_draw(self.cmd_buf, 3, 1, 0, 0);
+                }
                 self.bvk.dev.cmd_end_render_pass(self.cmd_buf);
             }
             self.bvk.dev.end_command_buffer(self.cmd_buf).ok()?;
@@ -128,10 +135,12 @@ impl VulkanPlayground {
 
     pub fn resize(&mut self, w: u32, h: u32) -> Option<()> {
         unsafe { self.bvk.dev.device_wait_idle().unwrap() };
+        self.pipeline.destroy(&self.bvk);
         self.render.destroy(&self.bvk);
         self.swappy.destroy(&self.bvk);
         self.swappy = VulkanSwapchain::create(&self.bvk, w, h)?;
         self.render = VulkanRender::create(&self.bvk, &self.swappy)?;
+        self.pipeline = VulkanPipeline::create(&self.bvk, &self.render, self.swappy.extent)?;
         Some(())
     }
 }
@@ -145,6 +154,7 @@ impl Drop for VulkanPlayground {
             self.bvk.dev.destroy_semaphore(self.present_semaphore, None);
             self.bvk.dev.destroy_fence(self.frame_fence, None);
         }
+        self.pipeline.destroy(&self.bvk);
         self.render.destroy(&self.bvk);
         self.swappy.destroy(&self.bvk);
         self.bvk.destroy();
