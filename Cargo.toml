@@ -1,0 +1,10 @@
+[package]
+name = "vulkan-rust-step-by-step"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ash = { version = "0.36.0", default-features = false, features = ["linked", "debug"] }
+winit = { version = "0.26.1", default-features = false, features = ["x11"] }
