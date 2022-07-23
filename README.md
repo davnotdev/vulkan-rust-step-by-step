@@ -17,8 +17,17 @@ Oh, and it only works on Linux (or other X11) :p.
 ##  Latest Commits
 
 >  I might have forgotten to fill this in for every commit.
->  Just use `git reflog` or something lazy guy. :)
+>  Just use `git log --all --oneline` or something lazy guy. :)
 
 - Initialization, Render Loop, and Color! ~ 566 SLOC
+
+![](/images/0.png)
+
 - Hello Triangle w/ RGB! ~ 748 SLOC
+
+![](/images/1.png)
+
+- Exact Same Triangle with Vertex Buffers! ~ 854 SLOC
+
+![](/images/2.png)
 

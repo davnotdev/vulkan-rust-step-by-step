@@ -8,7 +8,13 @@ pub struct VulkanPipeline {
 }
 
 impl VulkanPipeline {
-    pub fn create(bvk: &BabyVulkan, render: &VulkanRender, extent: vk::Extent2D) -> Option<Self> {
+    pub fn create(
+        bvk: &BabyVulkan,
+        render: &VulkanRender,
+        extent: vk::Extent2D,
+        bindings: &[vk::VertexInputBindingDescription],
+        attributes: &[vk::VertexInputAttributeDescription],
+    ) -> Option<Self> {
         //  Create the shaders
         let vert_shader = Self::create_shader_module(bvk, "./vertex.spv")?;
         let frag_shader = Self::create_shader_module(bvk, "./fragment.spv")?;
@@ -29,8 +35,8 @@ impl VulkanPipeline {
         //  Create Vertex Input State Info
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
             //  Our triangles are currently builtin
-            .vertex_binding_descriptions(&[])
-            .vertex_attribute_descriptions(&[])
+            .vertex_binding_descriptions(bindings)
+            .vertex_attribute_descriptions(attributes)
             .build();
 
         //  Create Input Assembly Info

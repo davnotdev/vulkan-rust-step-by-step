@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 ash = { version = "0.36.0", default-features = false, features = ["linked", "debug"] }
 winit = { version = "0.26.1", default-features = false, features = ["x11"] }
+vk-mem = { git = "https://github.com/gwihlidal/vk-mem-rs" }
 
 [build-dependencies]
 shaderc = "0.8"

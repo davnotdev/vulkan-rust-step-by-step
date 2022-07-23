@@ -13,6 +13,7 @@ pub struct BabyVulkan {
     pub debug: vk::DebugUtilsMessengerEXT,
     pub graphics_queue: vk::Queue,
     pub present_queue: vk::Queue,
+    pub alloc: vk_mem::Allocator,
 }
 
 impl BabyVulkan {
@@ -108,6 +109,10 @@ impl BabyVulkan {
         let present_queue = unsafe { dev.get_device_queue(queue_families.present, 0) };
         let graphics_queue = unsafe { dev.get_device_queue(queue_families.graphics, 0) };
 
+        //  Create the Allocator
+        let alloc =
+            vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(&instance, &dev, &gpu)).ok()?;
+
         Some(BabyVulkan {
             instance,
             entry,
@@ -120,6 +125,7 @@ impl BabyVulkan {
             debug,
             graphics_queue,
             present_queue,
+            alloc,
         })
     }
 
