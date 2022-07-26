@@ -31,3 +31,7 @@ Oh, and it only works on Linux (or other X11) :p.
 
 ![](/images/2.png)
 
+- Yet Another Triangle but Spinning! ~ 906 SLOC
+
+![](/images/3.gif)
+

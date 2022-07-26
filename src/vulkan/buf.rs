@@ -74,3 +74,19 @@ impl VertexBuffer {
         }
     }
 }
+
+#[repr(C)]
+pub struct PushConstantData {
+    pub mvp: glm::Mat4,
+}
+
+impl PushConstantData {
+    pub fn push_constants() -> vk::PushConstantRange {
+        vk::PushConstantRange::builder()
+            .offset(0)
+            .size(std::mem::size_of::<Self>() as u32)
+            .stage_flags(vk::ShaderStageFlags::VERTEX)
+            .build()
+    }
+}
+

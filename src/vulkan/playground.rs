@@ -14,6 +14,8 @@ pub struct VulkanPlayground {
     render_semaphore: vk::Semaphore,
     present_semaphore: vk::Semaphore,
     frame_fence: vk::Fence,
+
+    start: std::time::Instant,
 }
 
 impl VulkanPlayground {
@@ -27,6 +29,7 @@ impl VulkanPlayground {
             swappy.extent,
             &[Vertex::bindings()],
             &Vertex::attributes(),
+            &[PushConstantData::push_constants()],
         )?;
         let data = vec![
             Vertex {
@@ -40,7 +43,7 @@ impl VulkanPlayground {
             Vertex {
                 position: [0.5, 0.5, 1.0],
                 color: [1.0, 0.0, 0.0],
-            }
+            },
         ];
         let vbo = VertexBuffer::create(&data, &bvk)?;
         let cmd_pool = bvk.create_command_pool()?;
@@ -58,6 +61,8 @@ impl VulkanPlayground {
             swappy,
             render,
             pipeline,
+
+            start: std::time::Instant::now(),
         })
     }
 
@@ -123,6 +128,39 @@ impl VulkanPlayground {
                         vk::PipelineBindPoint::GRAPHICS,
                         self.pipeline.pipeline,
                     );
+                    let mut push_constant = PushConstantData {
+                        mvp: glm::identity(),
+                    };
+
+                    let view_mat = glm::identity();
+                    let view_mat = glm::translate(&view_mat, &glm::vec3(0.0, 0.0, -2.0));
+
+                    let model_mat = glm::identity();
+                    let model_mat = glm::rotate(
+                        &model_mat,
+                        self.start.elapsed().as_millis() as f32 / 8.0 * (glm::pi::<f32>() / 180.0),
+                        &glm::vec3(0.0, 1.0, 0.0),
+                    );
+
+                    let perspective = glm::perspective(
+                        800.0 / 600.0,
+                        90.0 * (glm::pi::<f32>() / 180.0),
+                        0.1,
+                        100.0,
+                    );
+
+                    push_constant.mvp = perspective * view_mat * model_mat;
+
+                    self.bvk.dev.cmd_push_constants(
+                        self.cmd_buf,
+                        self.pipeline.pipeline_layout,
+                        vk::ShaderStageFlags::VERTEX,
+                        0,
+                        std::slice::from_raw_parts(
+                            (&push_constant as *const PushConstantData) as *const u8,
+                            std::mem::size_of::<PushConstantData>(),
+                        ),
+                    );
                     self.bvk
                         .dev
                         .cmd_bind_vertex_buffers(self.cmd_buf, 0, &[self.vbo.buf], &[0]);
@@ -178,6 +216,7 @@ impl VulkanPlayground {
             self.swappy.extent,
             &[Vertex::bindings()],
             &Vertex::attributes(),
+            &[PushConstantData::push_constants()],
         )?;
         Some(())
     }
@@ -188,7 +227,7 @@ impl Drop for VulkanPlayground {
         unsafe {
             self.bvk.dev.device_wait_idle().unwrap();
         }
-            self.vbo.destroy(&mut self.bvk);
+        self.vbo.destroy(&mut self.bvk);
         unsafe {
             self.bvk.dev.destroy_command_pool(self.cmd_pool, None);
             self.bvk.dev.destroy_semaphore(self.render_semaphore, None);

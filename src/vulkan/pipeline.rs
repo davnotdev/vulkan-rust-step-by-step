@@ -14,6 +14,7 @@ impl VulkanPipeline {
         extent: vk::Extent2D,
         bindings: &[vk::VertexInputBindingDescription],
         attributes: &[vk::VertexInputAttributeDescription],
+        push_constants: &[vk::PushConstantRange],
     ) -> Option<Self> {
         //  Create the shaders
         let vert_shader = Self::create_shader_module(bvk, "./vertex.spv")?;
@@ -98,7 +99,9 @@ impl VulkanPipeline {
             .build();
 
         //  Create Pipeline Layout
-        let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder().build();
+        let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
+            .push_constant_ranges(push_constants)
+            .build();
         let pipeline_layout =
             unsafe { bvk.dev.create_pipeline_layout(&pipeline_layout_info, None) }.ok()?;
 
