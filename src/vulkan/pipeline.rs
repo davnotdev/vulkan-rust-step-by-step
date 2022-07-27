@@ -98,6 +98,17 @@ impl VulkanPipeline {
             }])
             .build();
 
+        //  Create Depth Stencil
+        let depth_info = vk::PipelineDepthStencilStateCreateInfo::builder()
+            .depth_test_enable(true)
+            .depth_write_enable(true)
+            .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL)
+            .depth_bounds_test_enable(false)
+            .stencil_test_enable(false)
+            .min_depth_bounds(0.0)
+            .max_depth_bounds(1.0)
+            .build();
+
         //  Create Pipeline Layout
         let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
             .push_constant_ranges(push_constants)
@@ -117,6 +128,7 @@ impl VulkanPipeline {
             .render_pass(render.render_pass)
             .subpass(0)
             .layout(pipeline_layout)
+            .depth_stencil_state(&depth_info)
             .build();
         let pipeline = unsafe {
             bvk.dev.create_graphics_pipelines(

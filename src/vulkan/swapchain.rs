@@ -69,7 +69,7 @@ impl VulkanSwapchain {
         let swapchain_images = unsafe { swapchain_ext.get_swapchain_images(swapchain) }.ok()?;
         let swapchain_image_views: Vec<vk::ImageView> = swapchain_images
             .into_iter()
-            .map(|img| bvk.create_image_view(img, format.format))
+            .map(|img| bvk.create_image_view(img, format.format, vk::ImageAspectFlags::COLOR))
             .collect::<Option<_>>()?;
 
         Some(VulkanSwapchain {

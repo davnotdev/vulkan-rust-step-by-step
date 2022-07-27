@@ -19,19 +19,31 @@ Oh, and it only works on Linux (or other X11) :p.
 >  I might have forgotten to fill this in for every commit.
 >  Just use `git log --all --oneline` or something lazy guy. :)
 
-- Initialization, Render Loop, and Color! ~ 566 SLOC
+1. Initialization, Render Loop, and Color! ~ 566 SLOC
 
 ![](/images/0.png)
 
-- Hello Triangle w/ RGB! ~ 748 SLOC
+2. Hello Triangle w/ RGB! ~ 748 SLOC
 
 ![](/images/1.png)
 
-- Exact Same Triangle with Vertex Buffers! ~ 854 SLOC
+3. Exact Same Triangle with Vertex Buffers! ~ 854 SLOC
 
 ![](/images/2.png)
 
-- Yet Another Triangle but Spinning! ~ 906 SLOC
+4. Yet Another Triangle but Spinning! ~ 906 SLOC
 
 ![](/images/3.gif)
+
+5. o/ Spinning Cube! ~ 1063 SLOC
+
+![](/images/4.gif)
+
+##  Mistake Log
+There will be a few commits with small afterthoughts or mistakes.
+Here is a list of currently known afterthoughts / mistakes.
+Be sure to check the latest commit's list.
+
+- Cleanup crashes with multiple Vertex Buffers ~ fixed @ 5
+- Forgot to include color attachment subpass dependency ~ fixed @ 5
 

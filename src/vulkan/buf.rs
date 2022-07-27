@@ -33,19 +33,19 @@ impl Vertex {
     }
 }
 
-pub struct VertexBuffer {
+pub struct Buffer {
     pub buf: vk::Buffer,
     pub allocation: vk_mem::Allocation,
 }
 
-impl VertexBuffer {
-    pub fn create(cpu_data: &Vec<Vertex>, bvk: &BabyVulkan) -> Option<Self> {
-        let cpu_data_size = cpu_data.len() * std::mem::size_of::<Vertex>();
+impl Buffer {
+    pub fn create<T>(cpu_data: &Vec<T>, bvk: &BabyVulkan, usage: vk::BufferUsageFlags) -> Option<Self> {
+        let cpu_data_size = cpu_data.len() * std::mem::size_of::<T>();
 
         //  Create and Allocate the Buffer
         let buffer_info = vk::BufferCreateInfo::builder()
             .size(cpu_data_size as u64)
-            .usage(vk::BufferUsageFlags::VERTEX_BUFFER)
+            .usage(usage)
             .build();
         let alloc_info = vk_mem::AllocationCreateInfo::new().usage(vk_mem::MemoryUsage::CpuToGpu);
         let (buf, allocation, _) =
@@ -64,13 +64,12 @@ impl VertexBuffer {
             bvk.alloc.unmap_memory(allocation);
         }
 
-        Some(VertexBuffer { buf, allocation })
+        Some(Buffer { buf, allocation })
     }
 
     pub fn destroy(&self, bvk: &mut BabyVulkan) {
         unsafe {
             bvk.alloc.destroy_buffer(self.buf, self.allocation);
-            bvk.alloc.destroy();
         }
     }
 }

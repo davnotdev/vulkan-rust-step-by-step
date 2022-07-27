@@ -6,7 +6,8 @@ pub struct VulkanPlayground {
     render: VulkanRender,
     pipeline: VulkanPipeline,
 
-    vbo: VertexBuffer,
+    vbo: Buffer,
+    ibo: Buffer,
 
     cmd_buf: vk::CommandBuffer,
     cmd_pool: vk::CommandPool,
@@ -31,24 +32,50 @@ impl VulkanPlayground {
             &Vertex::attributes(),
             &[PushConstantData::push_constants()],
         )?;
-        let data = vec![
+        let vertices = vec![
             Vertex {
-                position: [0.0, -0.5, 1.0],
-                color: [0.0, 0.0, 1.0],
+                position: [-0.5, -0.5, -0.5],
+                color: [1.0, 1.0, 1.0],
             },
             Vertex {
-                position: [-0.5, 0.5, 1.0],
-                color: [0.0, 1.0, 0.0],
+                position: [-0.5, 0.5, -0.5],
+                color: [0.85, 0.85, 0.85],
             },
             Vertex {
-                position: [0.5, 0.5, 1.0],
-                color: [1.0, 0.0, 0.0],
+                position: [0.5, 0.5, -0.5],
+                color: [0.7, 0.7, 0.7],
+            },
+            Vertex {
+                position: [0.5, -0.5, -0.5],
+                color: [0.55, 0.55, 0.55],
+            },
+            Vertex {
+                position: [-0.5, -0.5, 0.5],
+                color: [0.4, 0.4, 0.4],
+            },
+            Vertex {
+                position: [-0.5, 0.5, 0.5],
+                color: [0.25, 0.25, 0.25],
+            },
+            Vertex {
+                position: [0.5, 0.5, 0.5],
+                color: [0.1, 0.1, 0.1],
+            },
+            Vertex {
+                position: [0.5, -0.5, 0.5],
+                color: [0.0, 0.0, 0.0],
             },
         ];
-        let vbo = VertexBuffer::create(&data, &bvk)?;
+        let indices = vec![
+            0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 4, 0, 1, 4, 1, 5, 6, 2, 3, 6, 3, 7, 4, 0, 3, 4, 3,
+            7, 1, 5, 6, 1, 6, 2,
+        ];
+        let vbo = Buffer::create(&vertices, &bvk, vk::BufferUsageFlags::VERTEX_BUFFER)?;
+        let ibo = Buffer::create(&indices, &bvk, vk::BufferUsageFlags::INDEX_BUFFER)?;
         let cmd_pool = bvk.create_command_pool()?;
         Some(VulkanPlayground {
             vbo,
+            ibo,
 
             cmd_buf: bvk.create_primary_command_buffer(cmd_pool)?,
             cmd_pool,
@@ -103,18 +130,25 @@ impl VulkanPlayground {
                 .begin_command_buffer(self.cmd_buf, &cmd_begin_info)
                 .ok()?;
             {
-                let clear_value = vk::ClearValue {
+                let color_clear_value = vk::ClearValue {
                     color: vk::ClearColorValue {
                         float32: [0.2, 0.3, 0.5, 1.0],
                     },
                 };
+                let depth_clear_value = vk::ClearValue {
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 1.0,
+                        stencil: 0,
+                    },
+                };
+
                 let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
                     .render_pass(self.render.render_pass)
                     .render_area(vk::Rect2D {
                         offset: vk::Offset2D { x: 0, y: 0 },
                         extent: self.swappy.extent,
                     })
-                    .clear_values(&[clear_value])
+                    .clear_values(&[color_clear_value, depth_clear_value])
                     .framebuffer(*self.render.framebuffers.get(swapchain_image_idx as usize)?)
                     .build();
                 self.bvk.dev.cmd_begin_render_pass(
@@ -139,7 +173,7 @@ impl VulkanPlayground {
                     let model_mat = glm::rotate(
                         &model_mat,
                         self.start.elapsed().as_millis() as f32 / 8.0 * (glm::pi::<f32>() / 180.0),
-                        &glm::vec3(0.0, 1.0, 0.0),
+                        &glm::vec3(1.0, 0.0, 1.0),
                     );
 
                     let perspective = glm::perspective(
@@ -164,7 +198,14 @@ impl VulkanPlayground {
                     self.bvk
                         .dev
                         .cmd_bind_vertex_buffers(self.cmd_buf, 0, &[self.vbo.buf], &[0]);
-                    self.bvk.dev.cmd_draw(self.cmd_buf, 3, 1, 0, 0);
+                    self.bvk.dev.cmd_bind_index_buffer(
+                        self.cmd_buf,
+                        self.ibo.buf,
+                        0,
+                        vk::IndexType::UINT32,
+                    );
+                    //  self.bvk.dev.cmd_draw(self.cmd_buf, 3, 1, 0, 0);
+                    self.bvk.dev.cmd_draw_indexed(self.cmd_buf, 36, 1, 0, 0, 0);
                 }
                 self.bvk.dev.cmd_end_render_pass(self.cmd_buf);
             }
@@ -228,6 +269,7 @@ impl Drop for VulkanPlayground {
             self.bvk.dev.device_wait_idle().unwrap();
         }
         self.vbo.destroy(&mut self.bvk);
+        self.ibo.destroy(&mut self.bvk);
         unsafe {
             self.bvk.dev.destroy_command_pool(self.cmd_pool, None);
             self.bvk.dev.destroy_semaphore(self.render_semaphore, None);

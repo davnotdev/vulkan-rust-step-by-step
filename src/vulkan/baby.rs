@@ -129,8 +129,9 @@ impl BabyVulkan {
         })
     }
 
-    pub fn destroy(&self) {
+    pub fn destroy(&mut self) {
         unsafe {
+            self.alloc.destroy();
             self.surface_ext.destroy_surface(self.surface, None);
             self.dev.destroy_device(None);
             self.debug_ext
@@ -161,7 +162,12 @@ impl BabyVulkan {
         })
     }
 
-    pub fn create_image_view(&self, image: vk::Image, format: vk::Format) -> Option<vk::ImageView> {
+    pub fn create_image_view(
+        &self,
+        image: vk::Image,
+        format: vk::Format,
+        aspect: vk::ImageAspectFlags,
+    ) -> Option<vk::ImageView> {
         let image_view_info = vk::ImageViewCreateInfo::builder()
             .image(image)
             .format(format)
@@ -175,7 +181,7 @@ impl BabyVulkan {
             )
             .subresource_range(
                 vk::ImageSubresourceRange::builder()
-                    .aspect_mask(vk::ImageAspectFlags::COLOR)
+                    .aspect_mask(aspect)
                     .base_mip_level(0)
                     .level_count(1)
                     .base_array_layer(0)
