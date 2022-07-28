@@ -9,12 +9,9 @@ pub struct VulkanPlayground {
     vbo: Buffer,
     ibo: Buffer,
 
-    cmd_buf: vk::CommandBuffer,
     cmd_pool: vk::CommandPool,
 
-    render_semaphore: vk::Semaphore,
-    present_semaphore: vk::Semaphore,
-    frame_fence: vk::Fence,
+    frames: Frames<2>,
 
     start: std::time::Instant,
 }
@@ -77,12 +74,8 @@ impl VulkanPlayground {
             vbo,
             ibo,
 
-            cmd_buf: bvk.create_primary_command_buffer(cmd_pool)?,
+            frames: Frames::create(&bvk, cmd_pool)?,
             cmd_pool,
-
-            render_semaphore: bvk.create_semaphore()?,
-            present_semaphore: bvk.create_semaphore()?,
-            frame_fence: bvk.create_fence()?,
 
             bvk,
             swappy,
@@ -97,18 +90,24 @@ impl VulkanPlayground {
         let dims = window.inner_size();
         let w = dims.width;
         let h = dims.height;
+        let current_frame = self.frames.get_current_frame();
+        let current_cmd_buf = self.frames.cmd_bufs[current_frame];
+        let current_render_semaphore = self.frames.render_semaphores[current_frame];
+        let current_present_semaphore = self.frames.present_semaphores[current_frame];
+        let current_frame_fence = self.frames.frame_fences[current_frame];
         unsafe {
             //  Wait for the GPU to finish munching on our previous work and resize if neccesary
             assert!(self
                 .bvk
                 .dev
-                .wait_for_fences(&[self.frame_fence], true, std::u64::MAX)
+                .wait_for_fences(&[current_frame_fence], true, std::u64::MAX)
                 .is_ok());
+            assert!(self.bvk.dev.reset_fences(&[current_frame_fence]).is_ok());
             let (swapchain_image_idx, _suboptimal) =
                 match self.swappy.swapchain_ext.acquire_next_image(
                     self.swappy.swapchain,
                     std::u64::MAX,
-                    self.present_semaphore,
+                    current_present_semaphore,
                     vk::Fence::null(),
                 ) {
                     Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
@@ -118,7 +117,12 @@ impl VulkanPlayground {
                     Err(_) => None?,
                     Ok(ret) => ret,
                 };
-            assert!(self.bvk.dev.reset_fences(&[self.frame_fence]).is_ok());
+
+            assert!(self
+                .bvk
+                .dev
+                .reset_command_buffer(current_cmd_buf, vk::CommandBufferResetFlags::empty())
+                .is_ok());
 
             let cmd_begin_info = vk::CommandBufferBeginInfo::builder()
                 .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
@@ -127,7 +131,7 @@ impl VulkanPlayground {
             //  Record the command buffer
             self.bvk
                 .dev
-                .begin_command_buffer(self.cmd_buf, &cmd_begin_info)
+                .begin_command_buffer(current_cmd_buf, &cmd_begin_info)
                 .ok()?;
             {
                 let color_clear_value = vk::ClearValue {
@@ -152,13 +156,13 @@ impl VulkanPlayground {
                     .framebuffer(*self.render.framebuffers.get(swapchain_image_idx as usize)?)
                     .build();
                 self.bvk.dev.cmd_begin_render_pass(
-                    self.cmd_buf,
+                    current_cmd_buf,
                     &render_pass_begin_info,
                     vk::SubpassContents::INLINE,
                 );
                 {
                     self.bvk.dev.cmd_bind_pipeline(
-                        self.cmd_buf,
+                        current_cmd_buf,
                         vk::PipelineBindPoint::GRAPHICS,
                         self.pipeline.pipeline,
                     );
@@ -186,7 +190,7 @@ impl VulkanPlayground {
                     push_constant.mvp = perspective * view_mat * model_mat;
 
                     self.bvk.dev.cmd_push_constants(
-                        self.cmd_buf,
+                        current_cmd_buf,
                         self.pipeline.pipeline_layout,
                         vk::ShaderStageFlags::VERTEX,
                         0,
@@ -197,40 +201,43 @@ impl VulkanPlayground {
                     );
                     self.bvk
                         .dev
-                        .cmd_bind_vertex_buffers(self.cmd_buf, 0, &[self.vbo.buf], &[0]);
+                        .cmd_bind_vertex_buffers(current_cmd_buf, 0, &[self.vbo.buf], &[0]);
                     self.bvk.dev.cmd_bind_index_buffer(
-                        self.cmd_buf,
+                        current_cmd_buf,
                         self.ibo.buf,
                         0,
                         vk::IndexType::UINT32,
                     );
                     //  self.bvk.dev.cmd_draw(self.cmd_buf, 3, 1, 0, 0);
-                    self.bvk.dev.cmd_draw_indexed(self.cmd_buf, 36, 1, 0, 0, 0);
+                    self.bvk
+                        .dev
+                        .cmd_draw_indexed(current_cmd_buf, 36, 1, 0, 0, 0);
                 }
-                self.bvk.dev.cmd_end_render_pass(self.cmd_buf);
+                self.bvk.dev.cmd_end_render_pass(current_cmd_buf);
             }
-            self.bvk.dev.end_command_buffer(self.cmd_buf).ok()?;
+            self.bvk.dev.end_command_buffer(current_cmd_buf).ok()?;
 
             //  Ready to render!
             let submit_info = vk::SubmitInfo::builder()
                 .wait_dst_stage_mask(&[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT])
-                .wait_semaphores(&[self.present_semaphore])
-                .signal_semaphores(&[self.render_semaphore])
-                .command_buffers(&[self.cmd_buf])
+                .wait_semaphores(&[current_present_semaphore])
+                .signal_semaphores(&[current_render_semaphore])
+                .command_buffers(&[current_cmd_buf])
                 .build();
 
             self.bvk
                 .dev
-                .queue_submit(self.bvk.graphics_queue, &[submit_info], self.frame_fence)
+                .queue_submit(self.bvk.graphics_queue, &[submit_info], current_frame_fence)
                 .unwrap();
 
             //  Ready to display!
             let present_info = vk::PresentInfoKHR::builder()
-                .wait_semaphores(&[self.render_semaphore])
+                .wait_semaphores(&[current_render_semaphore])
                 .swapchains(&[self.swappy.swapchain])
                 .image_indices(&[swapchain_image_idx])
                 .build();
 
+            self.frames.advance();
             match self
                 .swappy
                 .swapchain_ext
@@ -272,10 +279,8 @@ impl Drop for VulkanPlayground {
         self.ibo.destroy(&mut self.bvk);
         unsafe {
             self.bvk.dev.destroy_command_pool(self.cmd_pool, None);
-            self.bvk.dev.destroy_semaphore(self.render_semaphore, None);
-            self.bvk.dev.destroy_semaphore(self.present_semaphore, None);
-            self.bvk.dev.destroy_fence(self.frame_fence, None);
         }
+        self.frames.destroy(&self.bvk);
         self.pipeline.destroy(&self.bvk);
         self.render.destroy(&self.bvk);
         self.swappy.destroy(&self.bvk);

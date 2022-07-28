@@ -33,17 +33,25 @@ Oh, and it only works on Linux (or other X11) :p.
 
 4. Yet Another Triangle but Spinning! ~ 906 SLOC
 
-![](/images/3.gif)
+![](/images/3.webm)
 
 5. o/ Spinning Cube! ~ 1063 SLOC
 
-![](/images/4.gif)
+![](/images/4.webm)
+
+6. Double Buffering! ~ 1111 SLOC
+
+![](/images/5.webm)
 
 ##  Mistake Log
+
 There will be a few commits with small afterthoughts or mistakes.
 Here is a list of currently known afterthoughts / mistakes.
 Be sure to check the latest commit's list.
 
 - Cleanup crashes with multiple Vertex Buffers ~ fixed @ 5
 - Forgot to include color attachment subpass dependency ~ fixed @ 5
+- Improved garbage README video quality ~ fixed @ 6
+- Forgot to reset command buffers ~ fixed @ 6
+- Fixed broken dependency versions ~ fixed @ 6
 
