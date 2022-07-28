@@ -6,6 +6,9 @@ pub struct Frames<const N: usize> {
     pub render_semaphores: [vk::Semaphore; N],
     pub present_semaphores: [vk::Semaphore; N],
     pub frame_fences: [vk::Fence; N],
+
+    // pub uniform_bufs: [vk::Buffer; N],
+    // pub uniform_allocations: [vk_mem::Allocation; N],
 }
 
 impl<const N: usize> Frames<N> {

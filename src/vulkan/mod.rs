@@ -11,6 +11,7 @@ mod pipeline;
 mod playground;
 mod render;
 mod swapchain;
+mod uniform;
 
 pub use baby::*;
 pub use buf::*;
@@ -20,3 +21,4 @@ pub use pipeline::*;
 pub use playground::*;
 pub use render::*;
 pub use swapchain::*;
+pub use uniform::*;

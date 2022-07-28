@@ -1,9 +1,12 @@
 use super::*;
 
+const FRAME_BUFFER_COUNT: usize = 2;
+
 pub struct VulkanPlayground {
     bvk: BabyVulkan,
     swappy: VulkanSwapchain,
     render: VulkanRender,
+    uniform: Uniform<FRAME_BUFFER_COUNT>,
     pipeline: VulkanPipeline,
 
     vbo: Buffer,
@@ -11,7 +14,7 @@ pub struct VulkanPlayground {
 
     cmd_pool: vk::CommandPool,
 
-    frames: Frames<2>,
+    frames: Frames<FRAME_BUFFER_COUNT>,
 
     start: std::time::Instant,
 }
@@ -21,6 +24,7 @@ impl VulkanPlayground {
         let bvk = BabyVulkan::create(window)?;
         let swappy = VulkanSwapchain::create(&bvk, w, h)?;
         let render = VulkanRender::create(&bvk, &swappy)?;
+        let uniform = Uniform::<FRAME_BUFFER_COUNT>::create(&bvk)?;
         let pipeline = VulkanPipeline::create(
             &bvk,
             &render,
@@ -28,6 +32,7 @@ impl VulkanPlayground {
             &[Vertex::bindings()],
             &Vertex::attributes(),
             &[PushConstantData::push_constants()],
+            &[uniform.descriptor_set_layout],
         )?;
         let vertices = vec![
             Vertex {
@@ -67,8 +72,8 @@ impl VulkanPlayground {
             0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 4, 0, 1, 4, 1, 5, 6, 2, 3, 6, 3, 7, 4, 0, 3, 4, 3,
             7, 1, 5, 6, 1, 6, 2,
         ];
-        let vbo = Buffer::create(&vertices, &bvk, vk::BufferUsageFlags::VERTEX_BUFFER)?;
-        let ibo = Buffer::create(&indices, &bvk, vk::BufferUsageFlags::INDEX_BUFFER)?;
+        let vbo = Buffer::create_with_data(&vertices, &bvk, vk::BufferUsageFlags::VERTEX_BUFFER)?;
+        let ibo = Buffer::create_with_data(&indices, &bvk, vk::BufferUsageFlags::INDEX_BUFFER)?;
         let cmd_pool = bvk.create_command_pool()?;
         Some(VulkanPlayground {
             vbo,
@@ -80,6 +85,7 @@ impl VulkanPlayground {
             bvk,
             swappy,
             render,
+            uniform,
             pipeline,
 
             start: std::time::Instant::now(),
@@ -95,6 +101,7 @@ impl VulkanPlayground {
         let current_render_semaphore = self.frames.render_semaphores[current_frame];
         let current_present_semaphore = self.frames.present_semaphores[current_frame];
         let current_frame_fence = self.frames.frame_fences[current_frame];
+        let elapsed = self.start.elapsed().as_millis();
         unsafe {
             //  Wait for the GPU to finish munching on our previous work and resize if neccesary
             assert!(self
@@ -176,7 +183,7 @@ impl VulkanPlayground {
                     let model_mat = glm::identity();
                     let model_mat = glm::rotate(
                         &model_mat,
-                        self.start.elapsed().as_millis() as f32 / 8.0 * (glm::pi::<f32>() / 180.0),
+                        elapsed as f32 / 8.0 * (glm::pi::<f32>() / 180.0),
                         &glm::vec3(1.0, 0.0, 1.0),
                     );
 
@@ -208,6 +215,26 @@ impl VulkanPlayground {
                         0,
                         vk::IndexType::UINT32,
                     );
+
+                    let uniform_data = UniformData {
+                        color: glm::vec4(1.0, 0.0, 0.0, 1.0)
+                            * ((elapsed as f32 / 500.0).sin() + 1.2),
+                    };
+                    self.uniform.uniform_bufs[current_frame].copy_data(
+                        &self.bvk,
+                        &uniform_data as *const UniformData as *const u8,
+                        std::mem::size_of::<UniformData>(),
+                    );
+
+                    self.bvk.dev.cmd_bind_descriptor_sets(
+                        current_cmd_buf,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        self.pipeline.pipeline_layout,
+                        0,
+                        &[self.uniform.descriptor_sets[current_frame]],
+                        &[],
+                    );
+
                     //  self.bvk.dev.cmd_draw(self.cmd_buf, 3, 1, 0, 0);
                     self.bvk
                         .dev
@@ -265,6 +292,7 @@ impl VulkanPlayground {
             &[Vertex::bindings()],
             &Vertex::attributes(),
             &[PushConstantData::push_constants()],
+            &[self.uniform.descriptor_set_layout],
         )?;
         Some(())
     }
@@ -277,6 +305,7 @@ impl Drop for VulkanPlayground {
         }
         self.vbo.destroy(&mut self.bvk);
         self.ibo.destroy(&mut self.bvk);
+        self.uniform.destroy(&mut self.bvk);
         unsafe {
             self.bvk.dev.destroy_command_pool(self.cmd_pool, None);
         }

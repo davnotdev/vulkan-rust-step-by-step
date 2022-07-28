@@ -33,38 +33,54 @@ impl Vertex {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Buffer {
     pub buf: vk::Buffer,
     pub allocation: vk_mem::Allocation,
 }
 
 impl Buffer {
-    pub fn create<T>(cpu_data: &Vec<T>, bvk: &BabyVulkan, usage: vk::BufferUsageFlags) -> Option<Self> {
-        let cpu_data_size = cpu_data.len() * std::mem::size_of::<T>();
+    pub fn null() -> Self {
+        Buffer {
+            buf: vk::Buffer::null(),
+            allocation: std::ptr::null_mut(),
+        }
+    }
 
+    pub fn create(data_size: usize, bvk: &BabyVulkan, usage: vk::BufferUsageFlags) -> Option<Self> {
         //  Create and Allocate the Buffer
         let buffer_info = vk::BufferCreateInfo::builder()
-            .size(cpu_data_size as u64)
+            .size(data_size as u64)
             .usage(usage)
             .build();
         let alloc_info = vk_mem::AllocationCreateInfo::new().usage(vk_mem::MemoryUsage::CpuToGpu);
         let (buf, allocation, _) =
             unsafe { bvk.alloc.create_buffer(&buffer_info, &alloc_info) }.unwrap();
 
+        Some(Buffer { buf, allocation })
+    }
+
+    pub fn create_with_data<T>(
+        cpu_data: &Vec<T>,
+        bvk: &BabyVulkan,
+        usage: vk::BufferUsageFlags,
+    ) -> Option<Self> {
+        let cpu_data_size = cpu_data.len() * std::mem::size_of::<T>();
+
+        let buf = Self::create(cpu_data_size, bvk, usage)?;
+        buf.copy_data(bvk, cpu_data.as_ptr() as *const u8, cpu_data_size);
+
+        Some(buf)
+    }
+
+    pub fn copy_data(&self, bvk: &BabyVulkan, ptr: *const u8, size: usize) -> Option<()> {
         //  Fill the Buffer
         unsafe {
-            let data = bvk.alloc.map_memory(allocation).ok()?;
-
-            std::ptr::copy_nonoverlapping::<u8>(
-                cpu_data.as_ptr() as *const u8,
-                data,
-                cpu_data_size,
-            );
-
-            bvk.alloc.unmap_memory(allocation);
-        }
-
-        Some(Buffer { buf, allocation })
+            let data = bvk.alloc.map_memory(self.allocation).ok()?;
+            std::ptr::copy_nonoverlapping::<u8>(ptr, data, size);
+            bvk.alloc.unmap_memory(self.allocation);
+        };
+        Some(())
     }
 
     pub fn destroy(&self, bvk: &mut BabyVulkan) {
@@ -88,4 +104,3 @@ impl PushConstantData {
             .build()
     }
 }
-
