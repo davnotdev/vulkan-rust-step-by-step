@@ -19,6 +19,25 @@ impl UniformData {
     }
 }
 
+pub struct UniformTexture {}
+
+impl UniformTexture {
+    pub fn binding() -> vk::DescriptorSetLayoutBinding {
+        let mut r = vk::DescriptorSetLayoutBinding::builder()
+            .binding(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .immutable_samplers(&[])
+            .descriptor_count(1)
+            .build();
+        
+        //  ???
+        r.p_immutable_samplers = std::ptr::null();
+
+        r
+    }
+}
+
 pub struct Uniform<const N: usize> {
     pub descriptor_set_layout: vk::DescriptorSetLayout,
     pub uniform_bufs: [Buffer; N],
@@ -27,10 +46,10 @@ pub struct Uniform<const N: usize> {
 }
 
 impl<const N: usize> Uniform<N> {
-    pub fn create(bvk: &BabyVulkan) -> Option<Self> {
+    pub fn create(bvk: &BabyVulkan, texture: &Texture) -> Option<Self> {
         //  Create Descriptor Set Layout
         let descriptor_set_layout = vk::DescriptorSetLayoutCreateInfo::builder()
-            .bindings(&[UniformData::binding()])
+            .bindings(&[UniformData::binding(), UniformTexture::binding()])
             .build();
 
         let descriptor_set_layout = unsafe {
@@ -39,24 +58,31 @@ impl<const N: usize> Uniform<N> {
         }
         .ok()?;
 
-        //  Create Uniform Buffers
+        //  Create Uniform Data Buffers
         let mut uniform_bufs = [Buffer::null(); N];
         for i in 0..N {
             uniform_bufs[i] = Buffer::create(
                 align_uniform_buffer_size(&bvk, std::mem::size_of::<UniformData>()),
                 bvk,
                 vk::BufferUsageFlags::UNIFORM_BUFFER,
+                vk_mem::MemoryUsage::CpuToGpu,
             )?;
         }
 
-        //  Create Descriptor Pool
-        let descriptor_pool_size = vk::DescriptorPoolSize::builder()
-            .descriptor_count(N as u32)
-            .ty(vk::DescriptorType::UNIFORM_BUFFER)
-            .build();
+        //  Create Descriptor Pools
+        let descriptor_pool_sizes = [
+            vk::DescriptorPoolSize::builder()
+                .descriptor_count(N as u32)
+                .ty(vk::DescriptorType::UNIFORM_BUFFER)
+                .build(),
+            vk::DescriptorPoolSize::builder()
+                .descriptor_count(N as u32)
+                .ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .build(),
+        ];
 
         let descriptor_pool_info = vk::DescriptorPoolCreateInfo::builder()
-            .pool_sizes(&[descriptor_pool_size])
+            .pool_sizes(&descriptor_pool_sizes)
             .max_sets(N as u32)
             .build();
 
@@ -82,19 +108,40 @@ impl<const N: usize> Uniform<N> {
             .iter()
             .zip(uniform_bufs.iter())
             .for_each(|(&set, uniform_buf)| {
+                //  UniformData
                 let buffer_info = vk::DescriptorBufferInfo::builder()
                     .buffer(uniform_buf.buf)
                     .range(std::mem::size_of::<UniformData>() as u64)
                     .offset(0)
                     .build();
-                let descriptor_write = vk::WriteDescriptorSet::builder()
+                let buf_descriptor_write = vk::WriteDescriptorSet::builder()
                     .dst_set(set)
                     .dst_binding(0)
                     .dst_array_element(0)
                     .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                     .buffer_info(&[buffer_info])
                     .build();
-                unsafe { bvk.dev.update_descriptor_sets(&[descriptor_write], &[]) }
+
+                //  UniformTexture
+                let image_info = vk::DescriptorImageInfo::builder()
+                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                    .image_view(texture.image_view)
+                    .sampler(texture.sampler)
+                    .build();
+                let image_descriptor_write = vk::WriteDescriptorSet::builder()
+                    .dst_set(set)
+                    .dst_binding(1)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&[image_info])
+                    .build();
+
+                unsafe {
+                    bvk.dev.update_descriptor_sets(
+                        &[buf_descriptor_write, image_descriptor_write],
+                        &[],
+                    )
+                }
             });
 
         Some(Uniform {

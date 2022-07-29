@@ -11,8 +11,10 @@ pub struct VulkanPlayground {
 
     vbo: Buffer,
     ibo: Buffer,
+    texture: Texture,
 
     cmd_pool: vk::CommandPool,
+    etc_fence: vk::Fence,
 
     frames: Frames<FRAME_BUFFER_COUNT>,
 
@@ -21,10 +23,16 @@ pub struct VulkanPlayground {
 
 impl VulkanPlayground {
     pub fn create(window: &Window, w: u32, h: u32) -> Option<Self> {
-        let bvk = BabyVulkan::create(window)?;
+        let mut bvk = BabyVulkan::create(window)?;
         let swappy = VulkanSwapchain::create(&bvk, w, h)?;
         let render = VulkanRender::create(&bvk, &swappy)?;
-        let uniform = Uniform::<FRAME_BUFFER_COUNT>::create(&bvk)?;
+
+        let cmd_pool = bvk.create_command_pool()?;
+        let etc_cmd_buf = bvk.create_primary_command_buffer(cmd_pool)?;
+        let etc_fence = bvk.create_fence(false)?;
+
+        let texture = Texture::create("texture.jpg", &mut bvk, etc_fence, etc_cmd_buf)?;
+        let uniform = Uniform::<FRAME_BUFFER_COUNT>::create(&bvk, &texture)?;
         let pipeline = VulkanPipeline::create(
             &bvk,
             &render,
@@ -34,53 +42,96 @@ impl VulkanPlayground {
             &[PushConstantData::push_constants()],
             &[uniform.descriptor_set_layout],
         )?;
+
+        //  Define Vertex and Index Data
         let vertices = vec![
             Vertex {
                 position: [-0.5, -0.5, -0.5],
                 color: [1.0, 1.0, 1.0],
+                uv: [0.0, 1.0],
             },
             Vertex {
                 position: [-0.5, 0.5, -0.5],
                 color: [0.85, 0.85, 0.85],
+                uv: [0.0, 0.0],
             },
             Vertex {
                 position: [0.5, 0.5, -0.5],
                 color: [0.7, 0.7, 0.7],
+                uv: [1.0, 0.0],
             },
             Vertex {
                 position: [0.5, -0.5, -0.5],
                 color: [0.55, 0.55, 0.55],
+                uv: [1.0, 1.0],
             },
             Vertex {
                 position: [-0.5, -0.5, 0.5],
                 color: [0.4, 0.4, 0.4],
+                uv: [0.0, 1.0],
             },
             Vertex {
                 position: [-0.5, 0.5, 0.5],
                 color: [0.25, 0.25, 0.25],
+                uv: [0.0, 0.0],
             },
             Vertex {
                 position: [0.5, 0.5, 0.5],
                 color: [0.1, 0.1, 0.1],
+                uv: [1.0, 0.0],
             },
             Vertex {
                 position: [0.5, -0.5, 0.5],
                 color: [0.0, 0.0, 0.0],
+                uv: [1.0, 1.0],
             },
         ];
+        //  Because I'm too lazy to define vertices for every side, the texture will look off. :)
         let indices = vec![
             0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 4, 0, 1, 4, 1, 5, 6, 2, 3, 6, 3, 7, 4, 0, 3, 4, 3,
             7, 1, 5, 6, 1, 6, 2,
         ];
-        let vbo = Buffer::create_with_data(&vertices, &bvk, vk::BufferUsageFlags::VERTEX_BUFFER)?;
-        let ibo = Buffer::create_with_data(&indices, &bvk, vk::BufferUsageFlags::INDEX_BUFFER)?;
-        let cmd_pool = bvk.create_command_pool()?;
+
+        //  Transfer a vbo Staging Buffer to GPU Memory
+        let staging_vbo = Buffer::create_with_data(
+            &vertices,
+            &bvk,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            vk_mem::MemoryUsage::CpuOnly,
+        )?;
+        let vbo = Buffer::create(
+            staging_vbo.size,
+            &bvk,
+            vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
+            vk_mem::MemoryUsage::GpuOnly,
+        )?;
+        Buffer::upload_copy_data(&staging_vbo, &vbo, &bvk, etc_fence, etc_cmd_buf)?;
+        staging_vbo.destroy(&mut bvk);
+
+        //  Transfer an ibo Staging Buffer to GPU Memory
+        let staging_ibo = Buffer::create_with_data(
+            &indices,
+            &bvk,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            vk_mem::MemoryUsage::CpuOnly,
+        )?;
+        let ibo = Buffer::create(
+            staging_ibo.size,
+            &bvk,
+            vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
+            vk_mem::MemoryUsage::GpuOnly,
+        )?;
+        Buffer::upload_copy_data(&staging_ibo, &ibo, &bvk, etc_fence, etc_cmd_buf)?;
+        staging_ibo.destroy(&mut bvk);
+
         Some(VulkanPlayground {
             vbo,
             ibo,
+            texture,
 
             frames: Frames::create(&bvk, cmd_pool)?,
             cmd_pool,
+            etc_fence,
 
             bvk,
             swappy,
@@ -220,7 +271,7 @@ impl VulkanPlayground {
                         color: glm::vec4(1.0, 0.0, 0.0, 1.0)
                             * ((elapsed as f32 / 500.0).sin() + 1.2),
                     };
-                    self.uniform.uniform_bufs[current_frame].copy_data(
+                    self.uniform.uniform_bufs[current_frame].map_copy_data(
                         &self.bvk,
                         &uniform_data as *const UniformData as *const u8,
                         std::mem::size_of::<UniformData>(),
@@ -305,8 +356,10 @@ impl Drop for VulkanPlayground {
         }
         self.vbo.destroy(&mut self.bvk);
         self.ibo.destroy(&mut self.bvk);
+        self.texture.destroy(&self.bvk);
         self.uniform.destroy(&mut self.bvk);
         unsafe {
+            self.bvk.dev.destroy_fence(self.etc_fence, None);
             self.bvk.dev.destroy_command_pool(self.cmd_pool, None);
         }
         self.frames.destroy(&self.bvk);

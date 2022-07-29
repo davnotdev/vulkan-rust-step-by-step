@@ -11,6 +11,7 @@ mod pipeline;
 mod playground;
 mod render;
 mod swapchain;
+mod texture;
 mod uniform;
 
 pub use baby::*;
@@ -21,4 +22,5 @@ pub use pipeline::*;
 pub use playground::*;
 pub use render::*;
 pub use swapchain::*;
+pub use texture::*;
 pub use uniform::*;

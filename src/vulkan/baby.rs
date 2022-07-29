@@ -13,6 +13,7 @@ pub struct BabyVulkan {
     pub debug: vk::DebugUtilsMessengerEXT,
     pub graphics_queue: vk::Queue,
     pub present_queue: vk::Queue,
+    pub transfer_queue: vk::Queue,
     pub alloc: vk_mem::Allocator,
 }
 
@@ -108,6 +109,7 @@ impl BabyVulkan {
         //  Get the queues
         let present_queue = unsafe { dev.get_device_queue(queue_families.present, 0) };
         let graphics_queue = unsafe { dev.get_device_queue(queue_families.graphics, 0) };
+        let transfer_queue = unsafe { dev.get_device_queue(queue_families.transfer, 0) };
 
         //  Create the Allocator
         let alloc =
@@ -125,6 +127,7 @@ impl BabyVulkan {
             debug,
             graphics_queue,
             present_queue,
+            transfer_queue,
             alloc,
         })
     }
@@ -221,9 +224,13 @@ impl BabyVulkan {
         unsafe { self.dev.create_semaphore(&semaphore_info, None) }.ok()
     }
 
-    pub fn create_fence(&self) -> Option<vk::Fence> {
+    pub fn create_fence(&self, signaled: bool) -> Option<vk::Fence> {
         let fence_info = vk::FenceCreateInfo::builder()
-            .flags(vk::FenceCreateFlags::SIGNALED)
+            .flags(if signaled {
+                vk::FenceCreateFlags::SIGNALED
+            } else {
+                vk::FenceCreateFlags::empty()
+            })
             .build();
         unsafe { self.dev.create_fence(&fence_info, None) }.ok()
     }

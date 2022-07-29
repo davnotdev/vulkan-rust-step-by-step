@@ -6,9 +6,6 @@ pub struct Frames<const N: usize> {
     pub render_semaphores: [vk::Semaphore; N],
     pub present_semaphores: [vk::Semaphore; N],
     pub frame_fences: [vk::Fence; N],
-
-    // pub uniform_bufs: [vk::Buffer; N],
-    // pub uniform_allocations: [vk_mem::Allocation; N],
 }
 
 impl<const N: usize> Frames<N> {
@@ -25,7 +22,7 @@ impl<const N: usize> Frames<N> {
             frames.cmd_bufs[i] = bvk.create_primary_command_buffer(cmd_pool)?;
             frames.render_semaphores[i] = bvk.create_semaphore()?;
             frames.present_semaphores[i] = bvk.create_semaphore()?;
-            frames.frame_fences[i] = bvk.create_fence()?;
+            frames.frame_fences[i] = bvk.create_fence(true)?;
         }
 
         Some(frames)

@@ -47,6 +47,10 @@ Oh, and it only works on Linux (or other X11) :p.
 
 ![](/images/6.gif)
 
+8. Spinning Cube with Texture! ~ 1574 SLOC
+
+![](/images/7.gif)
+
 ##  Mistake Log
 
 There will be a few commits with small afterthoughts or mistakes.
