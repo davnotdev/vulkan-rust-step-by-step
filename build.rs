@@ -17,12 +17,12 @@ fn main() {
         let input_file = String::from("src/") + input + ext;
         println!("cargo:rerun-if-changed={}", input_file);
         let input_str = std::fs::read_to_string(&input_file)
-            .expect(format!("Could not read {}", input_file).as_str());
+            .unwrap_or_else(|_| panic!("Could not read {}", input_file));
         let binary = compiler
             .compile_into_spirv(&input_str, kind, &input_file, "main", None)
-            .expect(format!("Failed to compile {}.", input_file).as_str());
+            .unwrap_or_else(|_| panic!("Failed to compile {}.", input_file));
         let output_file = String::from(input) + ".spv";
         std::fs::write(&output_file, binary.as_binary_u8())
-            .expect(format!("Could not write to {}", output_file).as_str());
+            .unwrap_or_else(|_| panic!("Could not write to {}", output_file));
     });
 }

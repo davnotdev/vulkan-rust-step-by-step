@@ -93,33 +93,23 @@ impl VulkanPlayground {
         ];
 
         //  Transfer a vbo Staging Buffer to GPU Memory
-        let staging_vbo = Buffer::create_with_data(
-            &vertices,
-            &bvk,
-            vk::BufferUsageFlags::TRANSFER_SRC,
-            vk_mem::MemoryUsage::CpuOnly,
-        )?;
+        let mut staging_vbo =
+            Buffer::create_with_data(&vertices, &bvk, vk::BufferUsageFlags::TRANSFER_SRC)?;
         let vbo = Buffer::create(
             staging_vbo.size,
             &bvk,
             vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
-            vk_mem::MemoryUsage::GpuOnly,
         )?;
         Buffer::upload_copy_data(&staging_vbo, &vbo, &bvk, etc_fence, etc_cmd_buf)?;
         staging_vbo.destroy(&mut bvk);
 
         //  Transfer an ibo Staging Buffer to GPU Memory
-        let staging_ibo = Buffer::create_with_data(
-            &indices,
-            &bvk,
-            vk::BufferUsageFlags::TRANSFER_SRC,
-            vk_mem::MemoryUsage::CpuOnly,
-        )?;
+        let mut staging_ibo =
+            Buffer::create_with_data(&indices, &bvk, vk::BufferUsageFlags::TRANSFER_SRC)?;
         let ibo = Buffer::create(
             staging_ibo.size,
             &bvk,
             vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
-            vk_mem::MemoryUsage::GpuOnly,
         )?;
         Buffer::upload_copy_data(&staging_ibo, &ibo, &bvk, etc_fence, etc_cmd_buf)?;
         staging_ibo.destroy(&mut bvk);
@@ -158,13 +148,13 @@ impl VulkanPlayground {
             assert!(self
                 .bvk
                 .dev
-                .wait_for_fences(&[current_frame_fence], true, std::u64::MAX)
+                .wait_for_fences(&[current_frame_fence], true, u64::MAX)
                 .is_ok());
             assert!(self.bvk.dev.reset_fences(&[current_frame_fence]).is_ok());
             let (swapchain_image_idx, _suboptimal) =
                 match self.swappy.swapchain_ext.acquire_next_image(
                     self.swappy.swapchain,
-                    std::u64::MAX,
+                    u64::MAX,
                     current_present_semaphore,
                     vk::Fence::null(),
                 ) {

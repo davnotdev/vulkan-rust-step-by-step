@@ -1,3 +1,7 @@
+// I like explicitly showing where numbers come from.
+#![allow(clippy::erasing_op)]
+#![allow(clippy::identity_op)]
+
 mod app;
 mod vulkan;
 

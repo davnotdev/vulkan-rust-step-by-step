@@ -24,11 +24,14 @@ impl Image {
             .tiling(vk::ImageTiling::OPTIMAL)
             .build();
 
-        let alloc_info = vk_mem::AllocationCreateInfo::new()
-            .usage(vk_mem::MemoryUsage::GpuOnly)
-            .required_flags(vk::MemoryPropertyFlags::DEVICE_LOCAL);
+        let alloc_info = vk_mem::AllocationCreateInfo {
+            usage: vk_mem::MemoryUsage::Auto,
+            // usage: vk_mem::MemoryUsage::GpuOnly,
+            required_flags: vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            ..Default::default()
+        };
 
-        let (image, allocation, _) =
+        let (image, allocation) =
             unsafe { bvk.alloc.create_image(&image_info, &alloc_info) }.ok()?;
 
         Some(Image {
@@ -38,9 +41,9 @@ impl Image {
         })
     }
 
-    pub fn destroy(&self, bvk: &BabyVulkan) {
+    pub fn destroy(&mut self, bvk: &BabyVulkan) {
         unsafe {
-            bvk.alloc.destroy_image(self.image, self.allocation);
+            bvk.alloc.destroy_image(self.image, &mut self.allocation);
         }
     }
 }

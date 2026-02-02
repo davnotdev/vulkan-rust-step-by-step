@@ -30,7 +30,7 @@ impl UniformTexture {
             .immutable_samplers(&[])
             .descriptor_count(1)
             .build();
-        
+
         //  ???
         r.p_immutable_samplers = std::ptr::null();
 
@@ -59,15 +59,20 @@ impl<const N: usize> Uniform<N> {
         .ok()?;
 
         //  Create Uniform Data Buffers
-        let mut uniform_bufs = [Buffer::null(); N];
-        for i in 0..N {
-            uniform_bufs[i] = Buffer::create(
-                align_uniform_buffer_size(&bvk, std::mem::size_of::<UniformData>()),
+        let mut uniform_bufs = [const { None }; N];
+        for b in uniform_bufs.iter_mut() {
+            *b = Some(Buffer::create(
+                align_uniform_buffer_size(bvk, std::mem::size_of::<UniformData>()),
                 bvk,
                 vk::BufferUsageFlags::UNIFORM_BUFFER,
-                vk_mem::MemoryUsage::CpuToGpu,
-            )?;
+            )?);
         }
+        let uniform_bufs: [Buffer; N] = uniform_bufs
+            .into_iter()
+            .map(|buffer| buffer.unwrap())
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
         //  Create Descriptor Pools
         let descriptor_pool_sizes = [
@@ -152,9 +157,11 @@ impl<const N: usize> Uniform<N> {
         })
     }
 
-    pub fn destroy(&self, bvk: &mut BabyVulkan) {
+    pub fn destroy(&mut self, bvk: &mut BabyVulkan) {
         unsafe {
-            self.uniform_bufs.iter().for_each(|buf| buf.destroy(bvk));
+            self.uniform_bufs
+                .iter_mut()
+                .for_each(|buf| buf.destroy(bvk));
             bvk.dev
                 .destroy_descriptor_set_layout(self.descriptor_set_layout, None);
             bvk.dev.destroy_descriptor_pool(self.descriptor_pool, None);

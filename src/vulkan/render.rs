@@ -130,7 +130,7 @@ impl VulkanRender {
         })
     }
 
-    pub fn destroy(&self, bvk: &BabyVulkan) {
+    pub fn destroy(&mut self, bvk: &BabyVulkan) {
         unsafe {
             bvk.dev.destroy_image_view(self.depth_image_view, None);
             self.depth_image.destroy(bvk);

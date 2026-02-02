@@ -2,6 +2,7 @@ use ash::*;
 use nalgebra_glm as glm;
 use std::ffi::{c_void, CString};
 use winit::{platform::unix::WindowExtUnix, window::Window};
+use vk_mem::Alloc;
 
 mod baby;
 mod buf;

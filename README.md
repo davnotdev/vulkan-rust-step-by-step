@@ -51,6 +51,8 @@ Oh, and it only works on Linux (or other X11) :p.
 
 ![](/images/7.gif)
 
+9. Updates Dependencies (Feb 2026)
+
 ##  Mistake Log
 
 There will be a few commits with small afterthoughts or mistakes.

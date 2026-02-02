@@ -35,11 +35,10 @@ impl Texture {
 
         //  Copy Image Data -> Staging Buffer
         let image_size = (x * y * 4) as usize;
-        let staging_image = Buffer::create(
+        let mut staging_image = Buffer::create(
             image_size,
             bvk,
             vk::BufferUsageFlags::TRANSFER_SRC,
-            vk_mem::MemoryUsage::CpuOnly,
         )?;
         staging_image.map_copy_data(bvk, image, image_size);
 
@@ -165,9 +164,7 @@ impl Texture {
             bvk.dev
                 .queue_submit(bvk.transfer_queue, &[submit_info], fence)
                 .ok()?;
-            bvk.dev
-                .wait_for_fences(&[fence], true, std::u64::MAX)
-                .ok()?;
+            bvk.dev.wait_for_fences(&[fence], true, u64::MAX).ok()?;
             bvk.dev.reset_fences(&[fence]).ok()?;
             bvk.dev
                 .reset_command_buffer(cmd_buf, vk::CommandBufferResetFlags::empty())
@@ -182,7 +179,7 @@ impl Texture {
         })
     }
 
-    pub fn destroy(&self, bvk: &BabyVulkan) {
+    pub fn destroy(&mut self, bvk: &BabyVulkan) {
         unsafe {
             bvk.dev.destroy_sampler(self.sampler, None);
             bvk.dev.destroy_image_view(self.image_view, None);

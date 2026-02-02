@@ -2,7 +2,7 @@ use super::*;
 
 //  First baby steps towards rendering.
 pub struct BabyVulkan {
-    pub entry: Entry,
+    pub _entry: Entry,
     pub instance: Instance,
     pub surface_ext: extensions::khr::Surface,
     pub surface: vk::SurfaceKHR,
@@ -65,13 +65,8 @@ impl BabyVulkan {
             .filter_map(|gpu| {
                 //  A suitable gpu must
                 //      1: Support graphics + present + tranfer
-                if let Some(queue_families) =
-                    QueueFamilies::create(&instance, gpu, surface, &surface_ext)
-                {
-                    Some((gpu, queue_families))
-                } else {
-                    None
-                }
+                QueueFamilies::create(&instance, gpu, surface, &surface_ext)
+                    .map(|queue_families| (gpu, queue_families))
             })
             .collect();
         let (gpu, queue_families) = suitable_gpus.into_iter().next()?;
@@ -100,7 +95,7 @@ impl BabyVulkan {
             .collect();
         let dev_info = vk::DeviceCreateInfo::builder()
             .enabled_extension_names(&extensions)
-            .enabled_layer_names(&layers)
+            // .enabled_layer_names(&layers)
             .enabled_features(&features)
             .queue_create_infos(&queue_infos)
             .build();
@@ -113,11 +108,11 @@ impl BabyVulkan {
 
         //  Create the Allocator
         let alloc =
-            vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(&instance, &dev, &gpu)).ok()?;
+            vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(&instance, &dev, gpu)).ok()?;
 
         Some(BabyVulkan {
             instance,
-            entry,
+            _entry: entry,
             surface,
             surface_ext,
             gpu,
@@ -134,7 +129,6 @@ impl BabyVulkan {
 
     pub fn destroy(&mut self) {
         unsafe {
-            self.alloc.destroy();
             self.surface_ext.destroy_surface(self.surface, None);
             self.dev.destroy_device(None);
             self.debug_ext
@@ -256,13 +250,13 @@ impl QueueFamilies {
         for (idx, prop) in queue_family_props.iter().enumerate() {
             let idx = idx as u32;
             if prop.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
-                graphics = Some(idx);
+                graphics.get_or_insert(idx);
             }
             if prop.queue_flags.contains(vk::QueueFlags::TRANSFER) {
-                transfer = Some(idx);
+                transfer.get_or_insert(idx);
             }
             if unsafe { surface_ext.get_physical_device_surface_support(gpu, idx, surface) }.ok()? {
-                present = Some(idx)
+                present.get_or_insert(idx);
             }
         }
         Some(QueueFamilies {

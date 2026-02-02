@@ -47,8 +47,7 @@ impl VulkanSwapchain {
             vk::PresentModeKHR::IMMEDIATE,
         ]
         .into_iter()
-        .filter(|mode| surface_presents.iter().find(|&p| p == mode).is_some())
-        .next()?;
+        .find(|mode| surface_presents.iter().any(|p| p == mode))?;
 
         //  Create the Swapchain
         let swapchain_ext = extensions::khr::Swapchain::new(&bvk.instance, &bvk.dev);

@@ -152,7 +152,7 @@ impl VulkanPipeline {
     }
 
     fn create_shader_module(bvk: &BabyVulkan, path: &str) -> Option<vk::ShaderModule> {
-        let code = std::fs::read(path).expect(&format!("Failed to read {}", path));
+        let code = std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read {}", path));
         let shader_info = vk::ShaderModuleCreateInfo::builder()
             .code(unsafe {
                 std::slice::from_raw_parts(code.as_ptr() as *const u32, code.len() / (32 / 8))

@@ -40,7 +40,7 @@ impl Vertex {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug)]
 pub struct Buffer {
     pub buf: vk::Buffer,
     pub allocation: vk_mem::Allocation,
@@ -48,27 +48,19 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    pub fn null() -> Self {
-        Buffer {
-            buf: vk::Buffer::null(),
-            allocation: std::ptr::null_mut(),
-            size: 0,
-        }
-    }
-
-    pub fn create(
-        data_size: usize,
-        bvk: &BabyVulkan,
-        usage: vk::BufferUsageFlags,
-        mem_usage: vk_mem::MemoryUsage,
-    ) -> Option<Self> {
+    pub fn create(data_size: usize, bvk: &BabyVulkan, usage: vk::BufferUsageFlags) -> Option<Self> {
         //  Create and Allocate the Buffer
         let buffer_info = vk::BufferCreateInfo::builder()
             .size(data_size as u64)
             .usage(usage)
             .build();
-        let alloc_info = vk_mem::AllocationCreateInfo::new().usage(mem_usage);
-        let (buf, allocation, _) =
+        let alloc_info = vk_mem::AllocationCreateInfo {
+            flags: vk_mem::AllocationCreateFlags::HOST_ACCESS_RANDOM,
+            usage: vk_mem::MemoryUsage::Auto,
+            required_flags: vk::MemoryPropertyFlags::HOST_VISIBLE,
+            ..Default::default()
+        };
+        let (buf, allocation) =
             unsafe { bvk.alloc.create_buffer(&buffer_info, &alloc_info) }.unwrap();
 
         Some(Buffer {
@@ -79,25 +71,24 @@ impl Buffer {
     }
 
     pub fn create_with_data<T>(
-        cpu_data: &Vec<T>,
+        cpu_data: &[T],
         bvk: &BabyVulkan,
         usage: vk::BufferUsageFlags,
-        mem_usage: vk_mem::MemoryUsage,
     ) -> Option<Self> {
-        let cpu_data_size = cpu_data.len() * std::mem::size_of::<T>();
+        let cpu_data_size = std::mem::size_of_val(cpu_data);
 
-        let buf = Self::create(cpu_data_size, bvk, usage, mem_usage)?;
+        let mut buf = Self::create(cpu_data_size, bvk, usage)?;
         buf.map_copy_data(bvk, cpu_data.as_ptr() as *const u8, cpu_data_size);
 
         Some(buf)
     }
 
-    pub fn map_copy_data(&self, bvk: &BabyVulkan, ptr: *const u8, size: usize) -> Option<()> {
+    pub fn map_copy_data(&mut self, bvk: &BabyVulkan, ptr: *const u8, size: usize) -> Option<()> {
         //  Fill the Buffer
         unsafe {
-            let data = bvk.alloc.map_memory(self.allocation).ok()?;
+            let data = bvk.alloc.map_memory(&mut self.allocation).ok()?;
             std::ptr::copy_nonoverlapping::<u8>(ptr, data, size);
-            bvk.alloc.unmap_memory(self.allocation);
+            bvk.alloc.unmap_memory(&mut self.allocation);
         };
         Some(())
     }
@@ -130,9 +121,7 @@ impl Buffer {
             bvk.dev
                 .queue_submit(bvk.transfer_queue, &[submit_info], fence)
                 .ok()?;
-            bvk.dev
-                .wait_for_fences(&[fence], true, std::u64::MAX)
-                .ok()?;
+            bvk.dev.wait_for_fences(&[fence], true, u64::MAX).ok()?;
 
             //  Cleanup
             bvk.dev.reset_fences(&[fence]).ok()?;
@@ -143,9 +132,9 @@ impl Buffer {
         Some(())
     }
 
-    pub fn destroy(&self, bvk: &mut BabyVulkan) {
+    pub fn destroy(&mut self, bvk: &mut BabyVulkan) {
         unsafe {
-            bvk.alloc.destroy_buffer(self.buf, self.allocation);
+            bvk.alloc.destroy_buffer(self.buf, &mut self.allocation);
         }
     }
 }
